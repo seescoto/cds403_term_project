@@ -1,0 +1,144 @@
+#entropy
+library(graphics)
+library(tidyverse) #pipe
+curve(-x * log2(x) - (1-x) * log2(1 - x), col = 'red', xlab = 'x', ylab = 'Entropy', lwd = 4)
+
+
+credit <- read.csv('credit.csv')
+str(credit)
+
+table(credit$checking_balance)
+table(credit$savings_balance)
+
+summary(credit$months_loan_duration)
+summary(credit$amount)
+credit %>% 
+  ggplot(aes(x = amount)) + 
+  geom_boxplot()
+#plot((credit$amount, decreasing = TRUE))
+  
+table(credit$default) #30 percent of ppl defaulted 
+
+
+
+###decision trees
+set.seed(3437)
+train_sample <- sample(1000, 900) #choose 1000 values out of 900
+str(train_sample)
+
+credit_train <- credit[train_sample, ]
+credit_test <- credit[-train_sample,]
+
+prop.table(table(credit_train$default))
+prop.table(table(credit_test$default))
+#sampling is good bc amounts of about the same
+
+
+library(C50) #decision tree
+credit_model <- C5.0(credit_train[-17], as.factor(credit_train$default)) 
+#credit_train[-17] removes col 17 which is the default variable
+#we dont want the target variable as a feature lol
+credit_model 
+str(credit_model)
+summary(credit_model)
+#17% error rate
+
+#decision trees have a big tendency to overfit 
+
+credit_pred <- predict(credit_model, credit_test)
+library(gmodels)
+library(caret)
+CrossTable(credit_test$default, credit_pred, prop.c = FALSE, prop.r = FALSE, 
+           dnn = c('actual default', 'predicted default'))
+#2 is default, 1 is not
+#cant get this to work - do it over
+confusionMatrix(credit_pred, credit_test$default)
+
+
+#improve model with adaptive boosting  - combining weak learners to get a strong model
+#ensemble model?
+
+credit_boost10 <- C5.0(credit_train[-17], as.factor(credit_train$default), trials = 10)
+credit_boost10
+summary(credit_boost10)
+#only 7.3 percent error rate!
+#does this overfit tho???? idk i'll ask
+#no it doesnt bc they are all different - not overfitting, just optimizing 
+#if error is like less than 5%, that's overfitting 
+
+credit_pred10 <- predict(credit_boost10, credit_test)
+CrossTable(credit_test$default, credit_pred10, prop.chisq = FALSE, prop.c = FALSE, 
+           prop.r = FALSE)
+
+#cost matrix - some errors are more costly than others
+matrix_dimensions <- list(c('no', 'yes'), c('no', 'yes'))
+names(matrix_dimensions) <- c ('predicted', 'actual')
+matrix_dimensions
+
+#cost for false negs is 0.33, cost for false pos is 1 - we just made this up 
+#based on what we wanna penalize
+error_cost <- matrix(c(0, 0.33, 1, 0), nrow = 2, dimnames = matrix_dimensions)
+error_cost
+
+
+credit_cost <- C5.0(credit_train[-17], as.factor(credit_train$default), costs = error_cost)
+credit_cost_pred <- predict(credit_cost, credit_test) 
+CrossTable(credit_test$default, credit_cost_pred, 
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE, 
+           dnn = c('actual default', 'predicted default'))
+#more false negatives and less false positives now that we gave false pos a higher cost
+#we can also do this with boosting! just add trials = whatever
+
+
+
+
+###rule learners - greedy learners dont need training testing sets
+#these go first come first serve, find best group then second best group, etc
+#rules are simpler
+#trees are limited by past decisions, rule learners arent
+
+#are mushrooms poisonous or not
+mushrooms <- read.csv('mushrooms.csv', stringsAsFactors = TRUE)
+mushrooms$veil_type
+mushrooms$veil_type <- NULL
+table(mushrooms$type)
+
+
+library(RWeka) #lol doesnt work fix that later
+#had version 86_x64 of R and arm64 of java, installed 86_x64 java so they match
+#oner finds best rule and then stops
+mushroom_1R <- OneR(type ~ ., data = mushrooms)
+#dont need to separate into training and testing sets!
+mushroom_1R
+summary(mushroom_1R)
+
+#nothing classified incorrectly ????? somehow??? 100 accuracy???
+#jrip finds best combo of rules and then stops
+mushroom_JRip <- JRip(type ~ ., data = mushrooms)
+mushroom_JRip
+summary(mushroom_JRip)
+
+##compare decison trees and 1r with mushrooms
+set.seed(3437)
+s = 0.8
+train_sample <- sample(dim(mushrooms)[1], s*dim(mushrooms)[1])
+str(train_sample)
+
+mushroom_train <- mushrooms[train_sample, ]
+mushroom_test <- mushrooms[-train_sample,]
+#pick a type for target 
+prop.table(table(mushroom_train$type))
+prop.table(table(mushroom_test$type))
+#props are about right
+
+mushrooms_model <- C5.0(mushroom_train[-1], mushroom_train$type)
+mushrooms_model
+summary(mushrooms_model)
+#no errors???
+
+mushrooms_pred <- predict(mushrooms_model, mushroom_test)
+CrossTable(mushroom_test$type, mushrooms_pred, prop.chisq = FALSE, prop.c = FALSE, 
+           prop.r = FALSE, dnn = c('actual type', 'predicted type'))
+#also no errors wtf
+
+

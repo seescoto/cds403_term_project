@@ -1,0 +1,127 @@
+##### CDS403 - Lecture 2. Understanding and Preparing the Data for ML
+
+### Let's pick a dataset and create a small ML model end to end
+
+library(caret) # this is the only package we need; install it with install.packages("caret")
+
+# let's get the data from this website: https://tess.mit.edu/observations/target-lists/
+# download all the .csv files
+# read about the data here: https://tess.mit.edu/observations/
+
+# read in and combine all the .csv files in one
+
+setwd("/Users/sofiaescoto/Desktop/CDS 403/week2/TESS archive")
+temp <- list.files(pattern="*.csv")
+myfiles <- lapply(temp, read.csv)
+
+dataset <- do.call("rbind", myfiles)
+
+# Let's look at the data
+# 1.Dimensions of the dataset.
+# 2.Types of the attributes.
+# 3.Peek at the data itself.
+# 4.Levels of the class attribute.
+# 5.Breakdown of the instances in each class.
+# 6.Statistical summary of all attributes.
+
+dim(dataset)
+
+# list types for each attribute
+sapply(dataset, class)
+
+# take a peek at the first 5 rows of the data
+head(dataset)
+
+# levels
+levels(as.factor(dataset$Camera))
+levels(as.factor(dataset$CCD))
+
+# summarize the class distribution
+#normalizing dataset so variables aren't on such different scales
+percentage <- prop.table(table(dataset$Dec)) * 100 
+cbind(freq=table(dataset$Dec), percentage=percentage)
+
+# summarize attribute distributions
+summary(dataset)
+
+##camera and ccd are basically categorical (should be factors)
+
+#tmag and RA are waaaayy diff in terms of distrbution, tmag is -2 to 21, ra is 0 to 360
+#also precision is diff
+
+# Let's visualize the data
+# We are going to look at two types of plots:
+# 1.Univariate plots to better understand each attribute.
+# 2.Multivariate plots to better understand the relationships between attributes.
+
+# split input and output
+x <- dataset[,3:6] #ccd, tmag, ra, dec
+y <- dataset[,2] #target variable!!! camera
+
+# boxplot for each attribute on one image
+#HOW??????? i dont know these commands lol where is ggplot
+par(mfrow=c(1,4))
+for(i in 3:6) { #should be 2:6
+  boxplot(dataset[,i], main=names(dataset)[i])
+}
+
+dev.off() #turns off visualization
+
+# barplot for class breakdown
+plot(as.factor(y), pch=18, col = "blue")
+
+# scatterplot matrix
+#DONT RUN MORE THAN ONCE, VISUALIZATION IS SAVED !!!
+### this takes at least 20 minutes to run depending on your computer, so be patient
+#
+#
+#
+#featurePlot(x=x, y=as.factor(y), plot="ellipse") 
+#
+#
+#
+
+
+#stuff she did in class
+plot(dataset$Tmag, type = "1", col = "blue")
+
+
+# box and whisker plots for each attribute
+featurePlot(x=x, y=as.factor(y), plot="box")
+
+# density plots for each attribute by class value
+scales <- list(x=list(relation="free"), y=list(relation="free"))
+featurePlot(x=x, y=as.factor(y), plot="density", scales=scales) ### this also takes 20 min. to run, so pay attention
+
+
+# We will split the loaded dataset into two, 80% of which we will use to train our models and 20% that we will hold back as a validation dataset.
+
+# create a list of 80% of the rows in the original dataset we can use for training
+validation_index <- createDataPartition(dataset$Camera, p=0.80, list=FALSE)
+# select 20% of the data for validation
+validation <- dataset[-validation_index,]
+# use the remaining 80% of data to training and testing the models
+dataset <- dataset[validation_index,]
+
+## Now let's run a model
+
+# Run algorithms using 10-fold cross validation
+control <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+
+# run linear algorithms
+set.seed(7)
+## check on Linear Discriminant Analysis: 
+fit.lda <- train(as.factor(Camera)~., data=dataset, method="lda", metric=metric, trControl=control)
+fit.lda2 <- train(as.factor(Camera)~., data=dataset, method="lda2", metric=metric, trControl=control)
+
+# summarize accuracy of models
+results <- resamples(list(lda=fit.lda, lda2=fit.lda2))
+summary(results)
+
+# compare accuracy of models
+dotplot(results)
+
+## Which model performed better?
+
+
