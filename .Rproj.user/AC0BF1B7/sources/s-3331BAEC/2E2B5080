@@ -1,27 +1,27 @@
 {
-    "id": "8EB029B8",
-    "path": "~/Desktop/CDS 403/term_project/term_project.r",
-    "project_path": "term_project.r",
+    "id": "2E2B5080",
+    "path": "~/Desktop/CDS 403/term_project/balancing classes.r",
+    "project_path": "balancing classes.r",
     "type": "r_source",
-    "hash": "2902422089",
+    "hash": "863242806",
     "contents": "",
     "dirty": false,
-    "created": 1650324346374.0,
+    "created": 1650347012539.0,
     "source_on_save": false,
-    "relative_order": 1,
+    "relative_order": 7,
     "properties": {
         "tempName": "Untitled1",
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "81,29",
-        "scrollLine": "73"
+        "cursorPosition": "38,0",
+        "scrollLine": "24"
     },
     "folds": "",
-    "lastKnownWriteTime": 1650348144,
+    "lastKnownWriteTime": 1650348365,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1650348144622,
+    "last_content_update": 1650348365831,
     "read_only": false,
     "read_only_alternatives": []
 }

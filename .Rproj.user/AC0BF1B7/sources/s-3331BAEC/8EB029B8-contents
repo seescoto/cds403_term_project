@@ -14,12 +14,10 @@ library(gmodels) #crosstable
 data <- read_excel('usa_foreign_workers_salary.xlsx')
 
 date <- '%m/%d/%y'
-#edit - remove case number, change variable formats to correct 
+#edit - remove case number, change variables to correct format 
 d <- data %>% 
   select(-CASE_NUMBER) %>% 
-  mutate(CASE_RECEIVED_DATE = as.Date(CASE_RECEIVED_DATE, format = date),
-         DECISION_DATE = as.Date(DECISION_DATE, format = date),
-         PREVAILING_WAGE_SUBMITTED = as.numeric(PREVAILING_WAGE_SUBMITTED),
+  mutate(PREVAILING_WAGE_SUBMITTED = as.numeric(PREVAILING_WAGE_SUBMITTED),
          PAID_WAGE_SUBMITTED = as.numeric(PAID_WAGE_SUBMITTED),
          EXPERIENCE_REQUIRED_NUM_MONTHS = as.numeric(EXPERIENCE_REQUIRED_NUM_MONTHS),
          WORK_POSTAL_CODE = as.numeric(WORK_POSTAL_CODE),
@@ -30,7 +28,6 @@ d %>% distinct(PREVAILING_WAGE_SUBMITTED_UNIT)
 d %>% 
   filter(PREVAILING_WAGE_SUBMITTED_UNIT == 'hour') %>% 
   select(PREVAILING_WAGE_SUBMITTED, PREVAILING_WAGE_SUBMITTED_UNIT, PREVAILING_WAGE_PER_YEAR)
-
 
 d %>% 
   filter(PREVAILING_WAGE_SUBMITTED_UNIT == 'bi-weekly') %>% 
@@ -57,18 +54,21 @@ d <- d %>%
     #anything else means the unit is 'year' so we can just go with the regular value
     TRUE ~ PAID_WAGE_SUBMITTED))
 
-#now we can take out those columns
+#now we can take out those columns + dates
 d <- d %>% 
   select(-c(PREVAILING_WAGE_SUBMITTED, PREVAILING_WAGE_SUBMITTED_UNIT, 
-            PAID_WAGE_SUBMITTED, PAID_WAGE_SUBMITTED_UNIT))
+            PAID_WAGE_SUBMITTED, PAID_WAGE_SUBMITTED_UNIT, DECISION_DATE, 
+            CASE_RECEIVED_DATE, EMPLOYER_NAME))
 
-d2 <- d %>% #no date columns
-  select(-c(DECISION_DATE, CASE_RECEIVED_DATE, EMPLOYER_NAME))
+
 
 #combine status into either certified (accepted) or denied or withdrawn
+#since certified withdrawn is a separate category but denied withdrawn isnt
+#im placing all withdrawn values with denied
 d2 <- d2 %>% 
   mutate(CASE_STATUS = case_when(CASE_STATUS == 'certified-expired' ~ 'certified',
                                  CASE_STATUS == 'certified-withdrawn' ~ 'certified',
+                                 CASE_STATUS == 'withdrawn' ~ 'denied',
                                  TRUE ~ CASE_STATUS)) #if else, leave it be
 
 
@@ -76,10 +76,11 @@ d2 <- d2 %>%
 d2[sapply(d2, is.character)] <- lapply(d2[sapply(d2, is.character)], 
                                        as.factor)
 
-#take out features that have wayy too many factors
+#take out features that have way too many factors
 d2 <- d2 %>% 
   select(-c(JOB_TITLE, WORK_CITY, COLLEGE_MAJOR_REQUIRED, PREVAILING_WAGE_SOC_CODE,
             PREVAILING_WAGE_SOC_TITLE))
+
 
 
 ##### 
@@ -89,6 +90,8 @@ d2 <- d2 %>%
 validation_index <- createDataPartition(d2$CASE_STATUS, p=0.80, list=FALSE)
 test <- d2[-validation_index,]
 train <- d2[validation_index,]
+
+#test %>% filter(CASE_STATUS == 'denied') %>% count()
 
 
 mod1 <- C5.0(train[-1], as.factor(train$CASE_STATUS))
@@ -100,7 +103,7 @@ summary(mod1)
 
 status_pred <- predict(mod1, test)
 CrossTable(test$CASE_STATUS, status_pred, prop.c = FALSE, prop.r = FALSE, 
-           dnn = c('actual status', 'predicted status'))
+           dnn = c('predicted status', 'actual status'))
 confusionMatrix(test$CASE_STATUS, status_pred)
 
 #pretty good but positive predictive value for denied is super low and 
@@ -121,9 +124,14 @@ confusionMatrix(test$CASE_STATUS, status_pred2)
 
 
 #lets increase cost of guessing denied wrong
-matrix_dimensions <- list(c('certified', 'denied', 'withdrawn'),
-                          c('certified', 'denied', 'withdrawn'))
+matrix_dimensions <- list(c('certified', 'denied'),
+                          c('certified', 'denied'))
 names(matrix_dimensions) <- c('predicted', 'actual')
+
+error_cost <- matrix(c(0, 5,
+                       1, 0), 
+                     nrow = 2, byrow = TRUE, dimnames = matrix_dimensions)
+error_cost
 
 
 status_cost <- C5.0(d2[-1], d2$CASE_STATUS, costs = error_cost)
@@ -131,9 +139,11 @@ status_cost_pred <- predict(status_cost, test)
 CrossTable(test$CASE_STATUS, status_cost_pred, 
            prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE, 
            dnn = c('actual', 'predicted'))
+confusionMatrix(status_cost_pred, test$CASE_STATUS)
 
-error_cost <- matrix(c(0, 0, 1, 5, 0, 1, 1, 0, 0), nrow = 3, byrow = TRUE,
-                     dimnames = matrix_dimensions)
-error_cost
+#specificity (true negative over all negative)
+#much less in this model, good if we want to be conservative about who will get in
+#but not so much if we want to be optimistic or even if we want to have the best
+#overall accuracy
 
-matrix_dimensions[1]
+
