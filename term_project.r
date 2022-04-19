@@ -124,10 +124,16 @@ confusionMatrix(test$CASE_STATUS, status_pred2)
 matrix_dimensions <- list(c('certified', 'denied', 'withdrawn'),
                           c('certified', 'denied', 'withdrawn'))
 names(matrix_dimensions) <- c('predicted', 'actual')
-matrix_dimensions %>% 
 
-error_cost <- matrix(c(5, 0, 1, 0, 5, 1), nrow = 2))
-, dimnames = matrix_dimensions)
+
+status_cost <- C5.0(d2[-1], d2$CASE_STATUS, costs = error_cost)
+status_cost_pred <- predict(status_cost, test) 
+CrossTable(test$CASE_STATUS, status_cost_pred, 
+           prop.chisq = FALSE, prop.c = FALSE, prop.r = FALSE, 
+           dnn = c('actual', 'predicted'))
+
+error_cost <- matrix(c(0, 0, 1, 5, 0, 1, 1, 0, 0), nrow = 3, byrow = TRUE,
+                     dimnames = matrix_dimensions)
 error_cost
 
 matrix_dimensions[1]
