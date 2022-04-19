@@ -13,7 +13,6 @@ library(gmodels) #crosstable
 #read in data
 data <- read_excel('usa_foreign_workers_salary.xlsx')
 
-date <- '%m/%d/%y'
 #edit - remove case number, change variables to correct format 
 d <- data %>% 
   select(-CASE_NUMBER) %>% 
@@ -39,7 +38,7 @@ d <- d %>%
     #change the calculated value to their wage per year based off how often they get paid
     PREVAILING_WAGE_SUBMITTED_UNIT == 'bi-weekly' ~ 24 * PREVAILING_WAGE_SUBMITTED,
     PREVAILING_WAGE_SUBMITTED_UNIT == 'moonth' ~ 12 * PREVAILING_WAGE_SUBMITTED,
-    PREVAILING_WAGE_SUBMITTED_UNIT == 'hour' ~ 40 * 4 * 8 * PREVAILING_WAGE_SUBMITTED,
+    PREVAILING_WAGE_SUBMITTED_UNIT == 'hour' ~ 40 * 48 * PREVAILING_WAGE_SUBMITTED,
     PREVAILING_WAGE_SUBMITTED_UNIT == 'week' ~ 48 * PREVAILING_WAGE_SUBMITTED,
     #anything else means the unit is 'year' so we can just go with the regular value
     TRUE ~ PREVAILING_WAGE_SUBMITTED))
@@ -49,9 +48,8 @@ d <- d %>%
   mutate(calculated_paid_wage_py = case_when(
     PAID_WAGE_SUBMITTED_UNIT == 'bi-weekly' ~ 24 * PAID_WAGE_SUBMITTED,
     PAID_WAGE_SUBMITTED_UNIT == 'moonth' ~ 12 * PAID_WAGE_SUBMITTED,
-    PAID_WAGE_SUBMITTED_UNIT == 'hour' ~ 40 * 4 * 8 * PAID_WAGE_SUBMITTED,
+    PAID_WAGE_SUBMITTED_UNIT == 'hour' ~ 40 * 48 * PAID_WAGE_SUBMITTED,
     PAID_WAGE_SUBMITTED_UNIT == 'week' ~ 48 * PAID_WAGE_SUBMITTED,
-    #anything else means the unit is 'year' so we can just go with the regular value
     TRUE ~ PAID_WAGE_SUBMITTED))
 
 #now we can take out those columns + dates
@@ -59,7 +57,6 @@ d <- d %>%
   select(-c(PREVAILING_WAGE_SUBMITTED, PREVAILING_WAGE_SUBMITTED_UNIT, 
             PAID_WAGE_SUBMITTED, PAID_WAGE_SUBMITTED_UNIT, DECISION_DATE, 
             CASE_RECEIVED_DATE, EMPLOYER_NAME))
-
 
 
 #combine status into either certified (accepted) or denied or withdrawn
@@ -72,7 +69,7 @@ d2 <- d2 %>%
                                  TRUE ~ CASE_STATUS)) #if else, leave it be
 
 
-#as factor for all character features
+#as factor for all character features so r can work with them
 d2[sapply(d2, is.character)] <- lapply(d2[sapply(d2, is.character)], 
                                        as.factor)
 
@@ -145,5 +142,55 @@ confusionMatrix(status_cost_pred, test$CASE_STATUS)
 #much less in this model, good if we want to be conservative about who will get in
 #but not so much if we want to be optimistic or even if we want to have the best
 #overall accuracy
+
+#i can't get a cost to fix the massive differnce in the number of classifications
+#i'm just going to balance the classes
+
+#get current props
+prop.table(table(d2$CASE_STATUS))
+#huge class imbalance which isn't good for decision trees because they can be easily 
+#overfitted and biased 
+
+#lets balance classes with upsampling
+
+#set.seed(13)
+balanced <- upSample(d2, d3$CASE_STATUS)
+balanced <- balanced %>% 
+  select(-Class) 
+
+prop.table(table(balanced$CASE_STATUS))
+#much better
+
+#splitting into testing and training
+vi <- createDataPartition(balanced$CASE_STATUS, p=0.80, list=FALSE)
+test1 <- balanced[-vi,]
+train1 <- balanced[vi,]
+
+
+#no boosting, no weights
+modb1 <- C5.0(train1[-1], train1$CASE_STATUS)
+summary(modb1)
+
+#plot(modb1)
+
+
+status_predb1 <- predict(modb1, test1)
+CrossTable(test1$CASE_STATUS, status_predb1, prop.c = FALSE, prop.r = FALSE, 
+           dnn = c('predicted status', 'actual status'))
+confusionMatrix(test1$CASE_STATUS, status_predb1)
+#eh, it's alright. Thinks are much more balanced (not some values really high and
+#others really low) but I'm sure i could do better
+
+#with boosting
+mod_boostb1 <- C5.0(train1[-1], train1$CASE_STATUS, trials = 10)
+mod_boostb1
+summary(mod_boostb1)
+
+status_predb2 <- predict(mod_boostb1, test1)
+CrossTable(test1$CASE_STATUS, status_predb2, prop.c = FALSE, prop.r = FALSE, 
+           dnn = c('actual status', 'predicted status'))
+confusionMatrix(test1$CASE_STATUS, status_predb2)
+#nice!!!! good sensitivity, specificity, everything is really good
+#error went down from 15.8 to 7.3
 
 
