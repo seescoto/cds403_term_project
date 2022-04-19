@@ -124,8 +124,10 @@ confusionMatrix(test$CASE_STATUS, status_pred2)
 matrix_dimensions <- list(c('certified', 'denied', 'withdrawn'),
                           c('certified', 'denied', 'withdrawn'))
 names(matrix_dimensions) <- c('predicted', 'actual')
-matrix_dimensions
+matrix_dimensions %>% 
 
-error_cost <- matrix(c(5, 0, 1, 0, 5, 1), nrow = 2)
-dimnames(error_cost) = list(c('predicted', 'actual'))
+error_cost <- matrix(c(5, 0, 1, 0, 5, 1), nrow = 2))
+, dimnames = matrix_dimensions)
 error_cost
+
+matrix_dimensions[1]
