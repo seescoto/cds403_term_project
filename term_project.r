@@ -37,7 +37,7 @@ d <- d %>%
   mutate(calculated_prev_wage_py = case_when( 
     #change the calculated value to their wage per year based off how often they get paid
     PREVAILING_WAGE_SUBMITTED_UNIT == 'bi-weekly' ~ 24 * PREVAILING_WAGE_SUBMITTED,
-    PREVAILING_WAGE_SUBMITTED_UNIT == 'moonth' ~ 12 * PREVAILING_WAGE_SUBMITTED,
+    PREVAILING_WAGE_SUBMITTED_UNIT == 'month' ~ 12 * PREVAILING_WAGE_SUBMITTED,
     PREVAILING_WAGE_SUBMITTED_UNIT == 'hour' ~ 40 * 48 * PREVAILING_WAGE_SUBMITTED,
     PREVAILING_WAGE_SUBMITTED_UNIT == 'week' ~ 48 * PREVAILING_WAGE_SUBMITTED,
     #anything else means the unit is 'year' so we can just go with the regular value
@@ -47,13 +47,13 @@ d <- d %>%
 d <- d %>% 
   mutate(calculated_paid_wage_py = case_when(
     PAID_WAGE_SUBMITTED_UNIT == 'bi-weekly' ~ 24 * PAID_WAGE_SUBMITTED,
-    PAID_WAGE_SUBMITTED_UNIT == 'moonth' ~ 12 * PAID_WAGE_SUBMITTED,
+    PAID_WAGE_SUBMITTED_UNIT == 'month' ~ 12 * PAID_WAGE_SUBMITTED,
     PAID_WAGE_SUBMITTED_UNIT == 'hour' ~ 40 * 48 * PAID_WAGE_SUBMITTED,
     PAID_WAGE_SUBMITTED_UNIT == 'week' ~ 48 * PAID_WAGE_SUBMITTED,
     TRUE ~ PAID_WAGE_SUBMITTED))
 
 #now we can take out those columns + dates
-d <- d %>% 
+d2 <- d %>% 
   select(-c(PREVAILING_WAGE_SUBMITTED, PREVAILING_WAGE_SUBMITTED_UNIT, 
             PAID_WAGE_SUBMITTED, PAID_WAGE_SUBMITTED_UNIT, DECISION_DATE, 
             CASE_RECEIVED_DATE, EMPLOYER_NAME))
@@ -143,7 +143,7 @@ confusionMatrix(status_cost_pred, test$CASE_STATUS)
 #but not so much if we want to be optimistic or even if we want to have the best
 #overall accuracy
 
-#i can't get a cost to fix the massive differnce in the number of classifications
+#i can't get a cost to fix the massive difference in the number of classifications
 #i'm just going to balance the classes
 
 #get current props
@@ -154,7 +154,7 @@ prop.table(table(d2$CASE_STATUS))
 #lets balance classes with upsampling
 
 #set.seed(13)
-balanced <- upSample(d2, d3$CASE_STATUS)
+balanced <- upSample(d2, d2$CASE_STATUS)
 balanced <- balanced %>% 
   select(-Class) 
 
@@ -170,8 +170,6 @@ train1 <- balanced[vi,]
 #no boosting, no weights
 modb1 <- C5.0(train1[-1], train1$CASE_STATUS)
 summary(modb1)
-
-#plot(modb1)
 
 
 status_predb1 <- predict(modb1, test1)
@@ -191,6 +189,6 @@ CrossTable(test1$CASE_STATUS, status_predb2, prop.c = FALSE, prop.r = FALSE,
            dnn = c('actual status', 'predicted status'))
 confusionMatrix(test1$CASE_STATUS, status_predb2)
 #nice!!!! good sensitivity, specificity, everything is really good
-#error went down from 15.8 to 7.3
+#error went down from > 16 to < 12
 
 
